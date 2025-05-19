@@ -1,4 +1,4 @@
-Total: 4.5 hours
+Total: 6.5 hours
 
 ## Sunday 18 May (2hr)
 
@@ -21,3 +21,13 @@ I researched how to spit my audio output into different channels. I ended up cho
 I start by taking the output from my audio jack and adding a coupling capacitor in serices to remove and DC offset from the audio signal, this is because the MSGEQ7 expects an AC audio signal. My design expects a line level input from an audio jack. 
 
 The reset and strope pins of the MSGEQ7 are connected to labels to be controlled by the ESP32. The output of the MSGEQ7 get given to an ADC on the ESP32. An external capacitor has been added for the oscilator in the MSGEQ7. An output filter capacitor has been added to provide stability to the output and a decoupling capacitor has been added to decouple to power supply. 
+
+## Monday 19 May (2hr)
+
+I added the esp32 control board here. I chose an ESP32 WROOM 32 dev module.
+
+![image.png](/PCB/Images/image-2.png)
+
+I started by powering the ESP32. This chip uses 3.3v and is therefore powered by my 3.3v rail. Ground is connected to my common ground rail. The EN pin is pulled to high with a button to connect it to ground and act as a reset button. I have 2 decoupling capacitors, these are an addition to the decoupling capacitors inside the model but can't hurt so why not! The MSGEQ7 output is connected to an ADC input with a voltage divider to bring the 0-5v signal down to a 0-3.3v signal. The strobe and reset pins from the MSGEQ7 are also connected to the ESP32 so they can be controlled via software. The 8 nixie tube control pins are connected to PWM capable outputs on the ESP32 to allow for dimming. The TXD and RXD pins are connected to test points to allow for flashing of firmware. the IO0 pin is pulled down to GND by a button to enter flashing mode and is conencted to +3.3v via a pull up resistor by default.
+
+The ESP32 can be flashed from the test points using a USB-to-Serial converter.
