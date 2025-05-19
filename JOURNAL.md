@@ -1,4 +1,4 @@
-Total: 6.5 hours
+Total: 9.5 hours
 
 ## Sunday 18 May (2hr)
 
@@ -31,3 +31,13 @@ I added the esp32 control board here. I chose an ESP32 WROOM 32 dev module.
 I started by powering the ESP32. This chip uses 3.3v and is therefore powered by my 3.3v rail. Ground is connected to my common ground rail. The EN pin is pulled to high with a button to connect it to ground and act as a reset button. I have 2 decoupling capacitors, these are an addition to the decoupling capacitors inside the model but can't hurt so why not! The MSGEQ7 output is connected to an ADC input with a voltage divider to bring the 0-5v signal down to a 0-3.3v signal. The strobe and reset pins from the MSGEQ7 are also connected to the ESP32 so they can be controlled via software. The 8 nixie tube control pins are connected to PWM capable outputs on the ESP32 to allow for dimming. The TXD and RXD pins are connected to test points to allow for flashing of firmware. the IO0 pin is pulled down to GND by a button to enter flashing mode and is conencted to +3.3v via a pull up resistor by default.
 
 The ESP32 can be flashed from the test points using a USB-to-Serial converter.
+
+## Monday 19 May (3hr)
+
+I created the driver circuity for the nixie tubes. This has been done assuming the 140v is on the +140v rail (I will add this circuitry later).
+
+![image.png](/PCB/Images/image-3.png)
+
+I first created a low pass filter for the PWM Smoothing converting the PWM from the ESP32 into a smooth analogue voltage. I have a 4.7K resistor from the nixie control pin to create this low pass filter. I have also got a capacitor from the filtered output to ground as a minimum cut off. I have added my nixie tube and connected the control to the collector if the driver transistor and the aux to ground via an auxillary cathode resistor. The annode is connected to 140v via a 14k resistor. I have used an op-amp to buffer the nixie control frequency and drivbe an NPN transistor. I am using a high voltage NPN transistor. I also have a base and emittor resistor connected to the trnasistor. The emitter resistor sets the relationship between the nixie control output and the current in the cathode.
+
+I then duplicated this design 7 times (one for each tube), changing the labels accordingly.
