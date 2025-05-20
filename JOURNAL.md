@@ -1,4 +1,4 @@
-Total: 9.5 hours
+Total: 14 hours
 
 ## Sunday 18 May (2hr)
 
@@ -41,3 +41,19 @@ I created the driver circuity for the nixie tubes. This has been done assuming t
 I first created a low pass filter for the PWM Smoothing converting the PWM from the ESP32 into a smooth analogue voltage. I have a 4.7K resistor from the nixie control pin to create this low pass filter. I have also got a capacitor from the filtered output to ground as a minimum cut off. I have added my nixie tube and connected the control to the collector if the driver transistor and the aux to ground via an auxillary cathode resistor. The annode is connected to 140v via a 14k resistor. I have used an op-amp to buffer the nixie control frequency and drivbe an NPN transistor. I am using a high voltage NPN transistor. I also have a base and emittor resistor connected to the trnasistor. The emitter resistor sets the relationship between the nixie control output and the current in the cathode.
 
 I then duplicated this design 7 times (one for each tube), changing the labels accordingly.
+
+## Tuesday 20 May (3hr)
+
+I created a power supply to boost my 5v to 140v to power the nixie tubes.
+
+![image.png](/PCB/Images/image-5.png)
+
+To create my 140v line, i am using a MAX1771 IC. This IC is commonplace on many nixie tube power boards and is therefore the obvious choice. I have performed input decoupling on the 5v power for the high voltage section. I am using an N channel mosfet which is driven by the MAX1771. The MAX1771 turns onm the mosfet allowing power to go through the inductor and through the mosfet to ground. The inductor opposes the change in current causing the current to ramp up linearly over time. The inductor stores its energy in its magnetic field. The diode is reverse biased during this phase, so no current can flow through it. The output capacitor is supplying current to the nixie tubes during this phase.
+
+The MAX1771 turns off the mosfet. The current cannot change in the inductor instantaneously, this means the inductor tries to maintain current flow. The indyctor then reverses its polarity, the reversed voltage addes to the input voltage creating a higher voltage. The diode becomes forward biased allowing current to flow from the inductor to the output capacitor. The inductor then ramps down its current linearly. This cycle repeats to create my high voltage.
+
+## Tuesday 20 May (1.5hr)
+
+Small Changes have been made. I have added 2 potentiometers for volume and brightness control. I added a shutdown button and linked the shutdown rail on the MAX1771 to the ESP32 to allow it to shut off the high voltage when not in use. I have also done general schematic cleanup and I have added labels for readability. I also added a serial controller to allow me to write to the ESP32 through the USB-C port. I used a CH340C due to the minimal extra circuitry needed. I also grounded the USB-C shield.
+
+![image.png](/PCB/Images/image-4.png)![image.png](/PCB/Images/image-6.png)![image.png](/PCB/Images/image-7.png)![image.png](/PCB/Images/image-8.png)![image.png](/PCB/Images/image-9.png)![image.png](/PCB/Images/image-10.png)
