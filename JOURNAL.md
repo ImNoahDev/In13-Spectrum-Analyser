@@ -57,3 +57,11 @@ The MAX1771 turns off the mosfet. The current cannot change in the inductor inst
 Small Changes have been made. I have added 2 potentiometers for volume and brightness control. I added a shutdown button and linked the shutdown rail on the MAX1771 to the ESP32 to allow it to shut off the high voltage when not in use. I have also done general schematic cleanup and I have added labels for readability. I also added a serial controller to allow me to write to the ESP32 through the USB-C port. I used a CH340C due to the minimal extra circuitry needed. I also grounded the USB-C shield.
 
 ![image.png](/PCB/Images/image-4.png)![image.png](/PCB/Images/image-6.png)![image.png](/PCB/Images/image-7.png)![image.png](/PCB/Images/image-8.png)![image.png](/PCB/Images/image-9.png)![image.png](/PCB/Images/image-10.png)
+
+## Wednesday 20 May (5hr)
+
+This was my first attempt at routing the PCB
+
+![image.png](/PCB/Images/image-11.png)
+
+I learned from this first attempt that a ground plane would be invaluble. This proved my PCB was possible to route on a 2 layer PCB. Next time, I will make my PCB longer and use the bottom layer as a ground plane. I have my tubes on the bottom layer with electronics on the top to allow and large components to face down giving me more flexibility in my case design. In my next iteration I will also add mounting holes and rounded edges. Finally, I will attempt to use the freerouter autorouter on my next iteration with a new pcb layout.
