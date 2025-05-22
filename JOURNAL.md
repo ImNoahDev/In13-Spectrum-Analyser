@@ -65,3 +65,11 @@ This was my first attempt at routing the PCB
 ![image.png](/PCB/Images/image-11.png)
 
 I learned from this first attempt that a ground plane would be invaluble. This proved my PCB was possible to route on a 2 layer PCB. Next time, I will make my PCB longer and use the bottom layer as a ground plane. I have my tubes on the bottom layer with electronics on the top to allow and large components to face down giving me more flexibility in my case design. In my next iteration I will also add mounting holes and rounded edges. Finally, I will attempt to use the freerouter autorouter on my next iteration with a new pcb layout.
+
+## Thursday 20 May (4hr)
+
+This is my second (and hopefully final) attempt at routing the PCB.
+
+![image.png](/PCB/Images/image-12.png)
+
+For this attempt, I used a ground plane on layer B to make routing easier. I also made the PCB longer to make it easier to route and to make the final assembly look better. I used freerouter to route this attempt as it gives a more optimised attempt than my manual attempt. After optimising the settings, freerouter was able to optimally route my PCB. I had to manually route my ground traces to the ground plane as freerouter does not support this automatically.
