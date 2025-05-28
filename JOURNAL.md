@@ -1,4 +1,4 @@
-Total: 19 hours
+Total: 24 hours
 
 ## Sunday 18 May (2hr)
 
