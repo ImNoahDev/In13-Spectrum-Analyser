@@ -84,4 +84,10 @@ Added readme.md
 
 ![image.png](/PCB/Images/image-13.png)
 
-![image.png](/PCB/Images/image-14.png)
+![image.png](/PCB/Images/image-14.png) 
+
+## Wed 28 May (2.5hr)
+
+I replaced certain footprints with ones available at JLPCB and re-routed.
+
+![image.png](/PCB/Images/image-15.png)
