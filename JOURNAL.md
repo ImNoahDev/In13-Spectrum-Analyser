@@ -73,3 +73,15 @@ This is my second (and hopefully final) attempt at routing the PCB.
 ![image.png](/PCB/Images/image-12.png)
 
 For this attempt, I used a ground plane on layer B to make routing easier. I also made the PCB longer to make it easier to route and to make the final assembly look better. I used freerouter to route this attempt as it gives a more optimised attempt than my manual attempt. After optimising the settings, freerouter was able to optimally route my PCB. I had to manually route my ground traces to the ground plane as freerouter does not support this automatically.
+
+## Wed 28 May (2.5hr)
+
+I have added a second ground plane to the top of the pcb. I have also added standoffs to the corners. I have cleaned up the schematic.
+
+I designed a case for my model using a combination of laser cut and 3d printed parts. My case uses a laser cut kerf bend to allow the sides to be cut as a single piece and then this piece can be wrapped around.
+
+Added readme.md
+
+![image.png](/PCB/Images/image-13.png)
+
+![image.png](/PCB/Images/image-14.png)
