@@ -1,4 +1,4 @@
-Total: 24 hours
+Total: 25 hours
 
 ## Sunday 18 May (2hr)
 
@@ -91,3 +91,7 @@ Added readme.md
 I replaced certain footprints with ones available at JLPCB and re-routed.
 
 ![image.png](/PCB/Images/image-15.png)
+
+## Sun 1 June (1hr)
+
+Added code for basic functionality and add mounting holes to the case to remove the need for glue.
