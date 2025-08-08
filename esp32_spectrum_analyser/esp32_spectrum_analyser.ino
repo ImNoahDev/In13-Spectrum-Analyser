@@ -28,8 +28,7 @@ static constexpr uint8_t PIN_POWER_BUTTON = 22;
 
 // Potentiometers (10k, reversed so high resistance yields 0)
 static constexpr uint8_t PIN_POT_GAIN = 35;  // IO35
-// Cool output: Beat pulse out to drive external effect (e.g., strobe relays)
-static constexpr uint8_t PIN_COOL_OUT = 16;  // IO16
+static constexpr uint8_t PIN_POT2 = 16;      // IO16 (spare)
 
 // ===========================
 // PWM (LEDC) configuration
@@ -44,10 +43,7 @@ portMUX_TYPE g_mux = portMUX_INITIALIZER_UNLOCKED;
 volatile bool g_newBandsReady = false;
 TaskHandle_t g_audioTaskHandle = nullptr;
 
-// Beat pulse feature (IO16)
-bool g_beatPulseEnabled = true;
-uint32_t g_lastBeatMs = 0;
-uint8_t g_prevAvg = 0;
+
 
 // ===========================
 // MSGEQ7 library object (NicoHood/MSGEQ7)
@@ -387,19 +383,7 @@ static bool isAudioLoud(const uint8_t bands[7]) {
   return avg >= g_audioThreshold;
 }
 
-static bool detectBeatAndPulse(const uint8_t bands[7]) {
-  // Simple beat: rising edge of average exceeding previous by threshold and above noise
-  uint16_t sum = 0; for (uint8_t i=0;i<7;++i) sum += bands[i];
-  uint8_t avg = sum/7;
-  bool beat = (avg > max<uint8_t>(g_audioThreshold+10, 30)) && (avg > g_prevAvg + 15);
-  g_prevAvg = avg;
-  if (beat && g_beatPulseEnabled) {
-    // Pulse IO16 for ~30ms (non-blocking pattern: set now, loop clears later)
-    digitalWrite(PIN_COOL_OUT, HIGH);
-    g_lastBeatMs = nowMs();
-  }
-  return beat;
-}
+
 
 static void readAudioAndUpdate() {
   bool newReading = MSGEQ7.read(MSGEQ7_INTERVAL);
@@ -412,9 +396,6 @@ static void readAudioAndUpdate() {
     float f = min(255.0f, x * g_volumeGain);
     bands[i] = (uint8_t)f;
   }
-
-  // Beat pulse
-  detectBeatAndPulse(bands);
 
   // Auto power logic
   if (isAudioLoud(bands)) {
@@ -674,14 +655,7 @@ button:hover{filter:brightness(1.08)}
           <label>Audio threshold (0-255)</label>
           <input type="number" id="thr" min="0" max="255" />
         </div>
-        <div>
-          <label>Beat Pulse</label>
-          <select id="beat">
-            <option value="0">Off</option>
-            <option value="1">On</option>
-          </select>
         </div>
-      </div>
       <div style="height:8px"></div>
       <button id="save">Save</button>
     </div>
@@ -724,10 +698,10 @@ button:hover{filter:brightness(1.08)}
 const tubes = document.getElementById('tubes');
 for(let i=0;i<7;i++){const d=document.createElement('div');d.className='tube';const v=document.createElement('div');v.style.height='0%';d.appendChild(v);tubes.appendChild(d)}
 function renderBands(b){[...tubes.children].forEach((t,i)=>{const v=t.firstChild;v.style.height=((b[i]||0)/255*100)+'%'})}
-async function getStatus(){const r=await fetch('/api/status');const j=await r.json();document.getElementById('name').textContent=j.name;document.getElementById('status').textContent=j.on?'On':'Off';document.getElementById('mirror').value=j.mirror?1:0;document.getElementById('ups').value=j.ups;document.getElementById('thr').value=j.thr;document.getElementById('beat').value=j.beat?1:0;document.getElementById('ssid').value=j.wifi.ssid||'';renderBands(j.bands||[])}
+async function getStatus(){const r=await fetch('/api/status');const j=await r.json();document.getElementById('name').textContent=j.name;document.getElementById('status').textContent=j.on?'On':'Off';document.getElementById('mirror').value=j.mirror?1:0;document.getElementById('ups').value=j.ups;document.getElementById('thr').value=j.thr;document.getElementById('ssid').value=j.wifi.ssid||'';renderBands(j.bands||[])}
 getStatus();setInterval(getStatus,1000);
 btnPower.onclick=()=>fetch('/api/power',{method:'POST'}).then(getStatus)
-save.onclick=()=>fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mirror: +document.getElementById('mirror').value===1, ups:+document.getElementById('ups').value, thr:+document.getElementById('thr').value, beat:+document.getElementById('beat').value===1})}).then(getStatus)
+save.onclick=()=>fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mirror: +document.getElementById('mirror').value===1, ups:+document.getElementById('ups').value, thr:+document.getElementById('thr').value})}).then(getStatus)
 saveWifi.onclick=()=>fetch('/api/wifi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ssid:document.getElementById('ssid').value,pass:document.getElementById('pass').value})}).then(()=>alert('Saved. Device will reconnect.'))
 resetWifi.onclick=()=>fetch('/api/reset-wifi',{method:'POST'}).then(()=>alert('WiFi reset. Device in AP mode.'))
 scan.onclick=async()=>{await fetch('/api/scan',{method:'POST'});setTimeout(loadPeers,600)}
@@ -749,7 +723,6 @@ static void handleApiStatus() {
   doc["mirror"] = g_mirrorMode;
   doc["ups"] = g_updatesPerSecond;
   doc["thr"] = g_audioThreshold;
-  doc["beat"] = g_beatPulseEnabled;
   JsonArray bands = doc.createNestedArray("bands");
   for (uint8_t i = 0; i < 7; ++i) bands.add(g_lastBands[i]);
   JsonObject wifiObj = doc.createNestedObject("wifi");
@@ -775,7 +748,6 @@ static void handleApiSettings() {
   g_updatesPerSecond = ups;
   uint8_t thr = doc["thr"].as<uint8_t>();
   g_audioThreshold = thr;
-  if (doc.containsKey("beat")) g_beatPulseEnabled = doc["beat"].as<bool>();
   saveSettingsToEEPROM();
   server.send(200, "text/plain", "OK");
 }
@@ -849,8 +821,6 @@ void setup() {
   pinMode(PIN_PSU_ENABLE, OUTPUT);
   digitalWrite(PIN_PSU_ENABLE, LOW);
   pinMode(PIN_POWER_BUTTON, INPUT_PULLUP);
-  pinMode(PIN_COOL_OUT, OUTPUT);
-  digitalWrite(PIN_COOL_OUT, LOW);
 
   // LEDC
   ledcInitAll();
@@ -894,10 +864,7 @@ void loop() {
   // Handle UDP receive
   udpHandle();
 
-  // Clear beat pulse after 30ms
-  if (digitalRead(PIN_COOL_OUT) == HIGH && (nowMs() - g_lastBeatMs) > 30) {
-    digitalWrite(PIN_COOL_OUT, LOW);
-  }
+
   // Pots and buttons on core 1
   updatePots();
   handleButton();
