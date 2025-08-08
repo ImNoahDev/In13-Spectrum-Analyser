@@ -18,26 +18,20 @@ static constexpr uint8_t PIN_MSGEQ7_ANALOG = 36;  // ADC1 channel (GPIO 36 is in
 // Tube output PWM pins (7 tubes)
 static constexpr uint8_t TUBE_PINS[7] = {13, 12, 14, 27, 33, 32, 15};
 
-// Global brightness PWM pin (drives your brightness control line)
-static constexpr uint8_t PIN_BRIGHTNESS_PWM = 23;
-
 // PSU enable control pin (active HIGH assumed)
 static constexpr uint8_t PIN_PSU_ENABLE = 22;
 
 // Power button (active LOW with pull-up). Use external pull-up if using input-only pins.
 static constexpr uint8_t PIN_POWER_BUTTON = 21;
 
-// Potentiometers (10k, reversed so high resistance yields 0). Use ADC1 pins.
-static constexpr uint8_t PIN_POT_BRIGHTNESS = 39; // ADC1 channel (GPIO 39 is input-only)
+// Potentiometer (10k, reversed so high resistance yields 0) for input gain.
 static constexpr uint8_t PIN_POT_VOLUME = 34;     // ADC1 channel (GPIO 34 is input-only)
 
 // ===========================
 // PWM (LEDC) configuration
 // ===========================
 static constexpr uint8_t LEDC_CHANNEL_TUBES[7] = {0, 1, 2, 3, 4, 5, 6};
-static constexpr uint8_t LEDC_CHANNEL_BRIGHTNESS = 7;
 static constexpr uint32_t LEDC_FREQ_TUBE = 20000;      // 20 KHz for height control
-static constexpr uint32_t LEDC_FREQ_BRIGHTNESS = 1000; // 1 KHz for global brightness
 static constexpr uint8_t LEDC_RES_BITS = 12;           // 0..4095
 static constexpr uint16_t LEDC_MAX = (1 << LEDC_RES_BITS) - 1; // 4095
 
@@ -70,8 +64,7 @@ static uint8_t g_audioThreshold = 25; // noise floor ~20 in 8-bit; adjust via we
 // Volume gain (from pot). We'll map pot to 0.25..2.0
 float g_volumeGain = 1.0f;
 
-// Brightness factor (from pot) 0..1, applied to both brightness PWM and tube PWM duty scaling
-float g_brightnessFactor = 1.0f;
+
 
 // Calibration maxima per tube (0..4095 for PWM duty)
 uint16_t g_tubeMaxDuty[7] = {4095,4095,4095,4095,4095,4095,4095};
@@ -247,24 +240,13 @@ static void ledcInitAll() {
     ledcAttachPin(TUBE_PINS[i], LEDC_CHANNEL_TUBES[i]);
     ledcWrite(LEDC_CHANNEL_TUBES[i], 0);
   }
-  // brightness
-  ledcSetup(LEDC_CHANNEL_BRIGHTNESS, LEDC_FREQ_BRIGHTNESS, LEDC_RES_BITS);
-  ledcAttachPin(PIN_BRIGHTNESS_PWM, LEDC_CHANNEL_BRIGHTNESS);
-  ledcWrite(LEDC_CHANNEL_BRIGHTNESS, 0);
 }
 
 static void setTubeDuty(uint8_t idx, uint16_t duty) {
   if (idx >= 7) return;
   duty = min<uint16_t>(duty, g_tubeMaxDuty[idx]);
-  float scaled = duty * g_brightnessFactor; // apply global brightness factor
-  if (scaled > LEDC_MAX) scaled = LEDC_MAX;
-  ledcWrite(LEDC_CHANNEL_TUBES[idx], (uint16_t)scaled);
-}
-
-static void setBrightnessPWM(float factor01) {
-  if (factor01 < 0) factor01 = 0; if (factor01 > 1) factor01 = 1;
-  uint16_t duty = (uint16_t)(factor01 * LEDC_MAX);
-  ledcWrite(LEDC_CHANNEL_BRIGHTNESS, duty);
+  if (duty > LEDC_MAX) duty = LEDC_MAX;
+  ledcWrite(LEDC_CHANNEL_TUBES[idx], duty);
 }
 
 static void clearAllTubes() {
@@ -367,18 +349,12 @@ static uint8_t g_lastBands[7] = {0};
 
 static void updatePots() {
   // Pot orientation reversed; scale and invert
-  int rawB = analogRead(PIN_POT_BRIGHTNESS); // 0..4095 typical
   int rawV = analogRead(PIN_POT_VOLUME);
-  // Normalize 0..1 with inversion
-  float b = 1.0f - (float)rawB / 4095.0f;
   float v = 1.0f - (float)rawV / 4095.0f;
   // Smooth a bit (optional)
-  static float sb = 1.0f, sv = 1.0f;
-  sb = sb * 0.85f + b * 0.15f;
+  static float sv = 1.0f;
   sv = sv * 0.85f + v * 0.15f;
-  g_brightnessFactor = sb;           // 0..1
   g_volumeGain = 0.25f + sv * 1.75f; // 0.25..2.0
-  setBrightnessPWM(g_brightnessFactor);
 }
 
 static void applyBandsToTubes(const uint8_t bands[7]) {
@@ -430,15 +406,14 @@ static void readAudioAndUpdate() {
 
   // Mirror/peer notify
   if (g_peerCount > 0) {
-    // Packet: 'S','A','D', on(1), 7 band bytes, brightness(1)
-    uint8_t buf[1 + 1 + 7 + 1 + 1];
+    // Packet: 'S','A','D', on(1), 7 band bytes
+    uint8_t buf[11];
     buf[0] = 'S'; buf[1] = 'A'; buf[2] = 'D';
     buf[3] = g_isOn ? 1 : 0;
     for (uint8_t i = 0; i < 7; ++i) buf[4 + i] = bands[i];
-    buf[11] = (uint8_t)(g_brightnessFactor * 255);
     for (uint8_t i = 0; i < g_peerCount; ++i) {
       udp.beginPacket(g_peers[i], UDP_PORT);
-      udp.write(buf, sizeof(buf));
+      udp.write(buf, 11);
       udp.endPacket();
     }
   }
@@ -494,7 +469,7 @@ static void showSettingsRate() {
 }
 
 static void doSettingsStep() {
-  // Use volume pot to select 1..7, brightness factor still applied globally
+  // Use volume pot to select 1..7
   int rawV = analogRead(PIN_POT_VOLUME);
   float v = 1.0f - (float)rawV / 4095.0f;
   uint8_t sel = (uint8_t)(v * 6.999f) + 1; // 1..7
@@ -559,11 +534,10 @@ static void udpHandle() {
     return;
   }
   // DATA
-  if (buf[0]=='S' && buf[1]=='A' && buf[2]=='D' && len >= 12) {
+  if (buf[0]=='S' && buf[1]=='A' && buf[2]=='D' && len >= 11) {
     bool remoteOn = buf[3] != 0;
     uint8_t rbands[7];
     for (uint8_t i = 0; i < 7; ++i) rbands[i] = buf[4+i];
-    uint8_t rbright = buf[11];
     if (remoteOn && !g_isOn) {
       // Turn on if peer detects audio first
       g_isOn = true;
@@ -573,8 +547,6 @@ static void udpHandle() {
       // Mirror bands
       memcpy(g_lastBands, rbands, 7);
       if (g_isOn && !g_inCalibration && !g_inSettings) applyBandsToTubes(rbands);
-      g_brightnessFactor = rbright / 255.0f;
-      setBrightnessPWM(g_brightnessFactor);
     }
     return;
   }
