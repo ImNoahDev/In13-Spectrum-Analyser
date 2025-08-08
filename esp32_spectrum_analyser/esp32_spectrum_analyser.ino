@@ -15,19 +15,20 @@
 // MSGEQ7 connections (shared reset & strobe, one analog out)
 static constexpr uint8_t PIN_MSGEQ7_RESET = 26;   // any digital pin
 static constexpr uint8_t PIN_MSGEQ7_STROBE = 25;  // any digital pin
-static constexpr uint8_t PIN_MSGEQ7_ANALOG = 36;  // ADC1 channel (GPIO 36 is input-only)
+static constexpr uint8_t PIN_MSGEQ7_ANALOG = 34;  // IO34
 
 // Tube output PWM pins (7 tubes)
 static constexpr uint8_t TUBE_PINS[7] = {13, 12, 14, 27, 33, 32, 15};
 
 // PSU enable control pin (active HIGH assumed)
-static constexpr uint8_t PIN_PSU_ENABLE = 22;
+static constexpr uint8_t PIN_PSU_ENABLE = 23;
 
 // Power button (active LOW with pull-up). Use external pull-up if using input-only pins.
-static constexpr uint8_t PIN_POWER_BUTTON = 21;
+static constexpr uint8_t PIN_POWER_BUTTON = 22;
 
-// Potentiometer (10k, reversed so high resistance yields 0) for input gain.
-static constexpr uint8_t PIN_POT_VOLUME = 34;     // ADC1 channel (GPIO 34 is input-only)
+// Potentiometers (10k, reversed so high resistance yields 0)
+static constexpr uint8_t PIN_POT_GAIN = 35;  // IO35
+static constexpr uint8_t PIN_POT_UNUSED = 16; // IO16 (optional spare)
 
 // ===========================
 // PWM (LEDC) configuration
@@ -356,7 +357,7 @@ static uint8_t g_lastBands[7] = {0};
 
 static void updatePots() {
   // Pot orientation reversed; scale and invert
-  int rawV = analogRead(PIN_POT_VOLUME);
+  int rawV = analogRead(PIN_POT_GAIN);
   float v = 1.0f - (float)rawV / 4095.0f;
   // Smooth a bit (optional)
   static float sv = 1.0f;
@@ -439,8 +440,8 @@ static void doCalibrationStep() {
   // Illuminate only current tube, others off
   for (uint8_t i = 0; i < 7; ++i) {
     if (i == g_calibIndex) {
-      // Use volume pot to set max duty
-      int rawV = analogRead(PIN_POT_VOLUME);
+      // Use gain pot to set max duty
+      int rawV = analogRead(PIN_POT_GAIN);
       float v = 1.0f - (float)rawV / 4095.0f; // reversed
       uint16_t maxDuty = (uint16_t)(v * LEDC_MAX);
       if (maxDuty < 10) maxDuty = 10;
@@ -482,8 +483,8 @@ static void showSettingsRate() {
 }
 
 static void doSettingsStep() {
-  // Use volume pot to select 1..7
-  int rawV = analogRead(PIN_POT_VOLUME);
+  // Use gain pot to select 1..7
+  int rawV = analogRead(PIN_POT_GAIN);
   float v = 1.0f - (float)rawV / 4095.0f;
   uint8_t sel = (uint8_t)(v * 6.999f) + 1; // 1..7
   if (sel < 1) sel = 1; if (sel > 7) sel = 7;
