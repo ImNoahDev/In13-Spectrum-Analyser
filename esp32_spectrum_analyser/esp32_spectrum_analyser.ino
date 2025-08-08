@@ -5,6 +5,8 @@
 #include <WiFiUdp.h>
 #include <ArduinoJson.h>
 #include <MSGEQ7.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 // ===========================
 // Hardware configuration
@@ -34,6 +36,11 @@ static constexpr uint8_t LEDC_CHANNEL_TUBES[7] = {0, 1, 2, 3, 4, 5, 6};
 static constexpr uint32_t LEDC_FREQ_TUBE = 20000;      // 20 KHz for height control
 static constexpr uint8_t LEDC_RES_BITS = 12;           // 0..4095
 static constexpr uint16_t LEDC_MAX = (1 << LEDC_RES_BITS) - 1; // 4095
+
+// Dual-core sync
+portMUX_TYPE g_mux = portMUX_INITIALIZER_UNLOCKED;
+volatile bool g_newBandsReady = false;
+TaskHandle_t g_audioTaskHandle = nullptr;
 
 // ===========================
 // MSGEQ7 library object (NicoHood/MSGEQ7)
@@ -389,33 +396,39 @@ static void readAudioAndUpdate() {
   if (isAudioLoud(bands)) {
     g_lastLoudMs = nowMs();
     if (!g_isOn) {
+      portENTER_CRITICAL(&g_mux);
       g_isOn = true;
       digitalWrite(PIN_PSU_ENABLE, HIGH);
+      portEXIT_CRITICAL(&g_mux);
     }
   }
   if (g_isOn && (nowMs() - g_lastLoudMs) > AUTO_OFF_MS) {
+    portENTER_CRITICAL(&g_mux);
     g_isOn = false;
     digitalWrite(PIN_PSU_ENABLE, LOW);
+    portEXIT_CRITICAL(&g_mux);
     clearAllTubes();
   }
 
-  if (g_isOn && !g_inCalibration && !g_inSettings) {
-    memcpy(g_lastBands, bands, 7);
+  // Apply locally only if not mirroring and not in UI modes
+  if (g_isOn && !g_inCalibration && !g_inSettings && !g_mirrorMode) {
     applyBandsToTubes(bands);
   }
 
-  // Mirror/peer notify
-  if (g_peerCount > 0) {
-    // Packet: 'S','A','D', on(1), 7 band bytes
-    uint8_t buf[11];
-    buf[0] = 'S'; buf[1] = 'A'; buf[2] = 'D';
-    buf[3] = g_isOn ? 1 : 0;
-    for (uint8_t i = 0; i < 7; ++i) buf[4 + i] = bands[i];
-    for (uint8_t i = 0; i < g_peerCount; ++i) {
-      udp.beginPacket(g_peers[i], UDP_PORT);
-      udp.write(buf, 11);
-      udp.endPacket();
-    }
+  // Publish new bands snapshot for loop()/UDP to use
+  portENTER_CRITICAL(&g_mux);
+  memcpy(g_lastBands, bands, 7);
+  g_newBandsReady = true;
+  portEXIT_CRITICAL(&g_mux);
+}
+
+// Audio task pinned to core 0
+void audioTask(void* pv) {
+  for (;;) {
+    // Only analyze when not in calibration/settings; still keep timers running
+    readAudioAndUpdate();
+    // Small delay to yield; MSGEQ7.read() enforces rate via interval
+    vTaskDelay(pdMS_TO_TICKS(2));
   }
 }
 
@@ -814,6 +827,9 @@ void setup() {
   // MSGEQ7
   MSGEQ7.begin();
 
+  // Create audio task on core 0
+  xTaskCreatePinnedToCore(audioTask, "audio", 4096, nullptr, 1, &g_audioTaskHandle, 0);
+
   // WiFi
   connectWiFiOrAP();
   udp.begin(UDP_PORT);
@@ -840,32 +856,54 @@ void setup() {
 void loop() {
   // Handle web
   server.handleClient();
-  // Handle UDP
+  // Handle UDP receive
   udpHandle();
-  // Pots
+
+  // Pots and buttons on core 1
   updatePots();
-  // Button
-  bool wasInCalibration = g_inCalibration;
-  bool wasInSettings = g_inSettings;
   handleButton();
 
-  // If in calibration, adjust selected tube and wait for short press to advance.
-  if (g_inCalibration) {
-    // Ensure PSU on during calibration
-    g_isOn = true;
-    digitalWrite(PIN_PSU_ENABLE, HIGH);
-    doCalibrationStep();
+  // Keep PSU on during UI modes
+  if (g_inCalibration || g_inSettings) {
+    if (!g_isOn) {
+      portENTER_CRITICAL(&g_mux);
+      g_isOn = true;
+      digitalWrite(PIN_PSU_ENABLE, HIGH);
+      portEXIT_CRITICAL(&g_mux);
+    }
   }
 
-  // Settings mode UI
+  // UI mode visuals
+  if (g_inCalibration) {
+    doCalibrationStep();
+  }
   if (g_inSettings) {
-    g_isOn = true;
-    digitalWrite(PIN_PSU_ENABLE, HIGH);
     doSettingsStep();
   }
 
-  // Normal audio update
-  if (!g_inCalibration && !g_inSettings) {
-    readAudioAndUpdate();
+  // Mirror/peer notify from core 1 to avoid UDP concurrency with receive
+  if (g_peerCount > 0 && !g_mirrorMode) {
+    bool sendNow = false;
+    uint8_t bands[7];
+    portENTER_CRITICAL(&g_mux);
+    if (g_newBandsReady) {
+      memcpy(bands, g_lastBands, 7);
+      g_newBandsReady = false;
+      sendNow = true;
+    }
+    portEXIT_CRITICAL(&g_mux);
+    if (sendNow) {
+      uint8_t buf[11];
+      buf[0] = 'S'; buf[1] = 'A'; buf[2] = 'D';
+      buf[3] = g_isOn ? 1 : 0;
+      for (uint8_t i = 0; i < 7; ++i) buf[4 + i] = bands[i];
+      for (uint8_t i = 0; i < g_peerCount; ++i) {
+        udp.beginPacket(g_peers[i], UDP_PORT);
+        udp.write(buf, 11);
+        udp.endPacket();
+      }
+    }
   }
+
+  // Normal audio update moved to audio task
 }
