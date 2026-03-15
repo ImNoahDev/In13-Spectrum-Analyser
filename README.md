@@ -1,5 +1,7 @@
 # Nixie tube spectrum analyser
 
+Warning: this is currently untested
+
 I have designed an audio spectrum analyser that breaks an audio signal down into 7 frequency bands and displays each band on an in13 nixie tube. My project has Wifi allowing for smart home control. My project has a volume (changes sensitivity) and a brightness potentiometer. Each PCB takes a single audio signal input and 2 can be used for full stereo.
 
 The case uses a laser cut kerf bend to allow the wrap around sheet to be cut in a single part. 
